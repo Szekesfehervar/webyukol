@@ -1,0 +1,86 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using ukol_15_3_2018.Model;
+using ukol_15_3_2018.Services;
+
+namespace ukol_15_3_2018
+{
+
+
+    public class SignUpModel : PageModel
+    {
+
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signinManager;
+        private readonly EmailSender _emailSender;
+
+        public SignUpModel(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signinManager, EmailSender emailSender)
+        {
+            _userManager = userManager;
+            _signinManager = signinManager;
+            _emailSender = emailSender;
+        }
+
+
+        [BindProperty]
+        public RegisterInputModel Input { get; set; }
+        public string SuccessMessage { get; set; }
+        public string ReturnUrl { get; set; }
+
+        public async Task<IActionResult> OnPost(string returnUrl = null)
+        {
+            returnUrl = returnUrl ?? Url.Content("./");
+            if (ModelState.IsValid)
+            {
+                var user = new ApplicationUser
+                {
+                    FirstName = Input.FirstName,
+                    LastName = Input.LastName,
+                    UserName = Input.Email,
+                    Email = Input.Email
+                };
+                var result = await _userManager.CreateAsync(user, Input.Password);
+                if (result.Succeeded)
+                {
+                    var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                    SuccessMessage = "Registrace se podařila. Kód je " + code;
+                    await _emailSender.SendEmailAsync(Input.Email, "Confirm your Mail", code);
+                    return RedirectToPage("AccountConfirmation", new { email = Input.Email });
+                }
+                foreach (var err in result.Errors)
+                {
+                    ModelState.AddModelError(string.Empty, err.Description);
+                }
+            }
+            return Page();
+        }
+    }
+
+
+    public class RegisterInputModel
+    {
+        [Required]
+        [Display(Name = "Jméno")]
+        public string FirstName { get; set; }
+        [Required]
+        public string LastName { get; set; }
+        [Required]
+        public string Email { get; set; }
+        [Required]
+        [DataType(DataType.Password)]
+        [StringLength(100, ErrorMessage = "Heslo musí mít délku mezi 6 a 100 znaky.", MinimumLength = 6)]
+        public string Password { get; set; }
+        [Required]
+        [DataType(DataType.Password)]
+        [Compare("Password", ErrorMessage = "Hesla se musí shodovat.")]
+        public string ConfirmPassword { get; set; }
+    }
+ 
+
+}
